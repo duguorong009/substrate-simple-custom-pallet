@@ -16,11 +16,13 @@ mod benchmarking;
 
 #[frame_support::pallet]
 pub mod pallet {
+	use super::*;
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
 
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
+	#[pallet::without_storage_info]
 	pub struct Pallet<T>(_);
 
 	#[pallet::config]
@@ -45,30 +47,29 @@ pub mod pallet {
 		MemberAlreadyExists,
 		/// The member does not exist, so it cannot be removed.
 		NoSuchMember,
-		/// Not `Root` origin caller
-		NotRootOrigin,
 	}
 	#[pallet::storage]
+	#[pallet::getter(fn clubs)]
 	pub(super) type Clubs<T: Config> = StorageMap<_, Blake2_128Concat, T::Hash, Vec<T::AccountId>>;
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		#[pallet::weight(0)]
+		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1, 1))]
 		pub fn add_member(
 			origin: OriginFor<T>,
 			club: T::Hash,
 			member: T::AccountId,
 		) -> DispatchResult {
 			// Check that the extrinsic was only called by `Root` origin
-			ensure_root(origin).map_err(|_e| Error::<T>::NotRootOrigin)?;
+			ensure_root(origin)?;
 
 			// Check if `club` exists & `member` already exists in the club
-			let mut members = Clubs::<T>::get(&club).ok_or(Error::<T>::ClubNotExists)?;
+			let mut members = Clubs::<T>::get(&club).unwrap_or(vec![]);
 			match members.iter().position(|m| m == &member) {
-				Some(id) => return Err(Error::<T>::MemberAlreadyExists),
+				Some(_) => return Err(Error::<T>::MemberAlreadyExists.into()),
 				None => {
 					// Add the `member` to the `club` & save the result.
-					members.push(member);
+					members.push(member.clone());
 					Clubs::<T>::insert(club, members);
 				},
 			}
@@ -79,14 +80,14 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::weight(0)]
+		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1, 1))]
 		pub fn remove_member(
 			origin: OriginFor<T>,
 			club: T::Hash,
 			member: T::AccountId,
 		) -> DispatchResult {
 			// Check that the extrinsic was only called by `Root` origin
-			ensure_root(origin).map_err(|_e| Error::<T>::NotRootOrigin)?;
+			ensure_root(origin)?;
 
 			// Check if `member` exists in `club`, if not return an error.
 			let mut members = Clubs::<T>::get(&club).ok_or(Error::<T>::ClubNotExists)?;
@@ -96,7 +97,7 @@ pub mod pallet {
 					members.swap_remove(id);
 					Clubs::<T>::insert(club, members);
 				},
-				None => return Err(Error::<T>::NoSuchMember),
+				None => return Err(Error::<T>::NoSuchMember.into()),
 			}
 
 			// Emit an event that the `member` was removed.
