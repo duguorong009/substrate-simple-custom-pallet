@@ -42,3 +42,31 @@ fn correct_error_for_no_club_exist() {
 		);
 	});
 }
+
+#[test]
+fn correct_error_when_no_member_to_remove() {
+	new_test_ext().execute_with(|| {
+		// Dispatch a signed extrinsic.
+		assert_ok!(CustomModule::add_member(Origin::root(), H256::default(), 123));
+
+		// Ensure the expected error is thrown when no `club` exists.
+		assert_noop!(
+			CustomModule::remove_member(Origin::root(), H256::default(), 234),
+			Error::<Test>::NoSuchMember,
+		);
+	});
+}
+
+#[test]
+fn correct_error_when_already_member_exist() {
+	new_test_ext().execute_with(|| {
+		// Dispatch a signed extrinsic.
+		assert_ok!(CustomModule::add_member(Origin::root(), H256::default(), 123));
+
+		// Ensure the expected error is thrown when no `club` exists.
+		assert_noop!(
+			CustomModule::add_member(Origin::root(), H256::default(), 123),
+			Error::<Test>::AlreadyMember,
+		);
+	});
+}

@@ -44,7 +44,7 @@ pub mod pallet {
 		/// The club does not exist
 		ClubNotExists,
 		/// The member already exists in club.
-		MemberAlreadyExists,
+		AlreadyMember,
 		/// The member does not exist, so it cannot be removed.
 		NoSuchMember,
 	}
@@ -66,7 +66,7 @@ pub mod pallet {
 			// Check if `club` exists & `member` already exists in the club
 			let mut members = Clubs::<T>::get(&club).unwrap_or(vec![]);
 			match members.iter().position(|m| m == &member) {
-				Some(_) => return Err(Error::<T>::MemberAlreadyExists.into()),
+				Some(_) => return Err(Error::<T>::AlreadyMember.into()),
 				None => {
 					// Add the `member` to the `club` & save the result.
 					members.push(member.clone());
