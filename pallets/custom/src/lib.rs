@@ -33,67 +33,75 @@ pub mod pallet {
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
 		/// Event emitted when a claim has been created.
-		ClaimCreated { who: T::AccountId, claim: T::Hash },
+		MemberAdded { who: T::AccountId, club: T::Hash },
 		/// Event emitted when a claim is revoked by the owner.
-		ClaimRevoked { who: T::AccountId, claim: T::Hash },
+		MemberRemoved { who: T::AccountId, club: T::Hash },
 	}
 	#[pallet::error]
 	pub enum Error<T> {
-		/// The claim already exists.
-		AlreadyClaimed,
-		/// The claim does not exist, so it cannot be revoked.
-		NoSuchClaim,
-		/// The claim is owned by another account, so caller can't revoke it.
-		NotClaimOwner,
+		/// The club does not exist
+		ClubNotExists,
+		/// The member already exists in club.
+		MemberAlreadyExists,
+		/// The member does not exist, so it cannot be removed.
+		NoSuchMember,
+		/// Not `Root` origin caller
+		NotRootOrigin,
 	}
 	#[pallet::storage]
-	pub(super) type Claims<T: Config> =
-		StorageMap<_, Blake2_128Concat, T::Hash, (T::AccountId, T::BlockNumber)>;
+	pub(super) type Clubs<T: Config> = StorageMap<_, Blake2_128Concat, T::Hash, Vec<T::AccountId>>;
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		#[pallet::weight(0)]
-		pub fn create_claim(origin: OriginFor<T>, claim: T::Hash) -> DispatchResult {
-			ensure_root(origin.clone())?;
+		pub fn add_member(
+			origin: OriginFor<T>,
+			club: T::Hash,
+			member: T::AccountId,
+		) -> DispatchResult {
+			// Check that the extrinsic was only called by `Root` origin
+			ensure_root(origin).map_err(|_e| Error::<T>::NotRootOrigin)?;
 
-			// // Check that the extrinsic was signed and get the signer.
-			// // This function will return an error if the extrinsic is not signed.
-			// let sender = ensure_signed(origin)?;
+			// Check if `club` exists & `member` already exists in the club
+			let mut members = Clubs::<T>::get(&club).ok_or(Error::<T>::ClubNotExists)?;
+			match members.iter().position(|m| m == &member) {
+				Some(id) => return Err(Error::<T>::MemberAlreadyExists),
+				None => {
+					// Add the `member` to the `club` & save the result.
+					members.push(member);
+					Clubs::<T>::insert(club, members);
+				},
+			}
 
-			// // Verify that the specified claim has not already been stored.
-			// ensure!(!Claims::<T>::contains_key(&claim), Error::<T>::AlreadyClaimed);
-
-			// // Get the block number from the FRAME System pallet.
-			// let current_block = <frame_system::Pallet<T>>::block_number();
-
-			// // Store the claim with the sender and block number.
-			// Claims::<T>::insert(&claim, (&sender, current_block));
-
-			// // Emit an event that the claim was created.
-			// Self::deposit_event(Event::ClaimCreated { who: sender, claim });
+			// Emit an event that the `member` was added.
+			Self::deposit_event(Event::MemberAdded { who: member, club });
 
 			Ok(())
 		}
 
 		#[pallet::weight(0)]
-		pub fn revoke_claim(origin: OriginFor<T>, claim: T::Hash) -> DispatchResult {
-			ensure_root(origin)?;
+		pub fn remove_member(
+			origin: OriginFor<T>,
+			club: T::Hash,
+			member: T::AccountId,
+		) -> DispatchResult {
+			// Check that the extrinsic was only called by `Root` origin
+			ensure_root(origin).map_err(|_e| Error::<T>::NotRootOrigin)?;
 
-			// // Check that the extrinsic was signed and get the signer.
-			// // This function will return an error if the extrinsic is not signed.
-			// let sender = ensure_signed(origin)?;
+			// Check if `member` exists in `club`, if not return an error.
+			let mut members = Clubs::<T>::get(&club).ok_or(Error::<T>::ClubNotExists)?;
+			match members.iter().position(|m| m == &member) {
+				Some(id) => {
+					// Remove the `member` from the `club` & save the result.
+					members.swap_remove(id);
+					Clubs::<T>::insert(club, members);
+				},
+				None => return Err(Error::<T>::NoSuchMember),
+			}
 
-			// // Get owner of the claim, if none return an error.
-			// let (owner, _) = Claims::<T>::get(&claim).ok_or(Error::<T>::NoSuchClaim)?;
+			// Emit an event that the `member` was removed.
+			Self::deposit_event(Event::MemberRemoved { who: member, club });
 
-			// // Verify that sender of the current call is the claim owner.
-			// ensure!(sender == owner, Error::<T>::NotClaimOwner);
-
-			// // Remove claim from storage.
-			// Claims::<T>::remove(&claim);
-
-			// // Emit an event that the claim was erased.
-			// Self::deposit_event(Event::ClaimRevoked { who: sender, claim });
 			Ok(())
 		}
 	}
