@@ -36,9 +36,9 @@ pub mod pallet {
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
 		/// Event emitted when a claim has been created.
-		MemberAdded { who: T::AccountId, club: T::Hash },
+		MemberAdded { who: T::AccountId, club: u128 },
 		/// Event emitted when a claim is revoked by the owner.
-		MemberRemoved { who: T::AccountId, club: T::Hash },
+		MemberRemoved { who: T::AccountId, club: u128 },
 	}
 	#[pallet::error]
 	pub enum Error<T> {
@@ -51,14 +51,14 @@ pub mod pallet {
 	}
 	#[pallet::storage]
 	#[pallet::getter(fn clubs)]
-	pub(super) type Clubs<T: Config> = StorageMap<_, Blake2_128Concat, T::Hash, Vec<T::AccountId>>;
+	pub(super) type Clubs<T: Config> = StorageMap<_, Blake2_128Concat, u128, Vec<T::AccountId>>;
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1, 1))]
 		pub fn add_member(
 			origin: OriginFor<T>,
-			club: T::Hash,
+			club: u128,
 			member: T::AccountId,
 		) -> DispatchResult {
 			// Check that the extrinsic was only called by `Root` origin
@@ -84,7 +84,7 @@ pub mod pallet {
 		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1, 1))]
 		pub fn remove_member(
 			origin: OriginFor<T>,
-			club: T::Hash,
+			club: u128,
 			member: T::AccountId,
 		) -> DispatchResult {
 			// Check that the extrinsic was only called by `Root` origin
